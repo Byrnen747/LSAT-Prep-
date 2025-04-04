@@ -1,0 +1,182 @@
+import pygame
+import sys
+import random
+
+# Initialize pygame
+pygame.init()
+
+# Set up display
+WIDTH, HEIGHT = 800, 600
+screen = pygame.display.set_mode((WIDTH, HEIGHT))
+pygame.display.set_caption("LSAT Forest Quiz")
+
+# Load images
+background = pygame.image.load("forest_background.jpg")
+background = pygame.transform.scale(background, (WIDTH, HEIGHT))
+coin_img = pygame.image.load("coin.png")
+coin_img = pygame.transform.scale(coin_img, (40, 40))
+
+# Font setup
+font = pygame.font.SysFont("Arial", 24)
+big_font = pygame.font.SysFont("Arial", 36)
+
+# Questions organized by LSAT section with difficulty multiplier
+question_sets = {
+    "Logical Reasoning": [
+        {"prompt": "Which of the following most accurately expresses the main point of the argument?", "options": ["A) The proposal is unworkable", "B) The conclusion is unsupported", "C) The reasoning is flawed", "D) The evidence contradicts itself"], "answer": "C", "value": 1},
+        {"prompt": "The author’s argument relies on which of the following assumptions?", "options": ["A) That all students benefit", "B) That no alternatives exist", "C) That test results reflect learning", "D) That students enjoy testing"], "answer": "C", "value": 2}
+    ],
+    "Reading Comprehension": [
+        {"prompt": "According to the passage, what is the primary purpose of the author in writing this text?", "options": ["A) To criticize a method", "B) To outline a theory", "C) To describe a process", "D) To advocate for reform"], "answer": "B", "value": 1},
+        {"prompt": "Which of the following is most supported by the information in the passage?", "options": ["A) The theory lacks modern support", "B) Recent studies challenge the view", "C) The argument builds on prior research", "D) Data contradicts earlier findings"], "answer": "C", "value": 2}
+    ],
+    "Analytical Reasoning": [
+        {"prompt": "If Amy sits next to Brad and Brad doesn’t sit next to Cara, which of the following must be true?", "options": ["A) Cara sits next to Amy", "B) Brad sits at the end", "C) Amy and Cara are not adjacent", "D) Cara is in the middle"], "answer": "C", "value": 2},
+        {"prompt": "Which one of the following could be true?", "options": ["A) All three people sit in a row", "B) Only Amy and Brad switch places", "C) Cara sits farthest from Amy", "D) Brad sits next to Cara"], "answer": "B", "value": 3}
+    ]
+}
+
+menu_active = True
+running = True
+score = 0
+question_index = 0
+show_results = False
+confetti = []
+questions = []
+selected_section = ""
+section_score = 0
+max_section_score = 0
+
+# Button helper
+def draw_button(text, x, y, w, h, action=None):
+    mouse = pygame.mouse.get_pos()
+    click = pygame.mouse.get_pressed()
+    color = (100, 200, 100) if x + w > mouse[0] > x and y + h > mouse[1] > y else (70, 130, 70)
+    pygame.draw.rect(screen, color, (x, y, w, h))
+    label = font.render(text, True, (255, 255, 255))
+    screen.blit(label, (x + (w - label.get_width()) // 2, y + (h - label.get_height()) // 2))
+    if click[0] == 1 and action and x + w > mouse[0] > x and y + h > mouse[1] > y:
+        action()
+
+# Menu screen
+def draw_menu():
+    screen.blit(background, (0, 0))
+    title = big_font.render("Choose a Section", True, (255, 255, 255))
+    screen.blit(title, (WIDTH // 2 - title.get_width() // 2, 100))
+    y_offset = 200
+    for section in question_sets:
+        draw_button(section, WIDTH // 2 - 100, y_offset, 200, 50, lambda s=section: start_quiz(s))
+        y_offset += 70
+    draw_button("Exit", WIDTH // 2 - 100, y_offset, 200, 50, exit_game)
+
+# Start quiz
+def start_quiz(section):
+    global menu_active, questions, question_index, score, selected_section, section_score, max_section_score
+    menu_active = False
+    question_index = 0
+    score = 0
+    section_score = 0
+    max_section_score = 0
+    selected_section = section
+    questions = []
+    for q in question_sets[section]:
+        q["section"] = section
+        questions.append(q)
+        max_section_score += q["value"]
+
+# Exit game
+def exit_game():
+    pygame.quit()
+    sys.exit()
+
+# Function to draw a question
+def draw_question():
+    screen.blit(background, (0, 0))
+    question = questions[question_index]
+    y = 20
+    section_text = font.render(f"Section: {question['section']}", True, (173, 216, 230))
+    screen.blit(section_text, (50, y))
+    y += 40
+    text = font.render(question["prompt"], True, (255, 255, 255))
+    screen.blit(text, (50, y))
+    y += 50
+    for i, option in enumerate(question["options"]):
+        opt_text = font.render(option, True, (255, 255, 255))
+        screen.blit(opt_text, (70, y + i * 40))
+    for i in range(score):
+        screen.blit(coin_img, (700 - i * 45, 10))
+
+# Results screen
+def draw_results():
+    screen.blit(background, (0, 0))
+    result_text = big_font.render("That's it — quiz complete!", True, (255, 255, 255))
+    screen.blit(result_text, (WIDTH // 2 - result_text.get_width() // 2, 100))
+    score_text = font.render(f"You snagged {section_score} coins out of {max_section_score}!", True, (255, 255, 255))
+    screen.blit(score_text, (WIDTH // 2 - score_text.get_width() // 2, 200))
+    level = "Brave Beginner"
+    if section_score >= max_section_score * 0.9:
+        level = "Full-Fledged Argument Slayer"
+    elif section_score >= max_section_score * 0.7:
+        level = "Logic Witch in Training"
+    elif section_score >= max_section_score * 0.5:
+        level = "Sharp Thinker"
+    level_text = font.render(f"Your vibe: {level}", True, (255, 255, 255))
+    screen.blit(level_text, (WIDTH // 2 - level_text.get_width() // 2, 250))
+    for particle in confetti:
+        pygame.draw.circle(screen, particle["color"], (particle["x"], particle["y"]), particle["radius"])
+        particle["y"] += particle["speed"]
+        particle["x"] += particle["drift"]
+
+# Confetti generator
+def generate_confetti():
+    global confetti
+    colors = [(255, 215, 0), (173, 216, 230), (255, 182, 193), (144, 238, 144)]
+    confetti = []
+    for _ in range(50):
+        confetti.append({
+            "x": random.randint(0, WIDTH),
+            "y": random.randint(-HEIGHT, 0),
+            "radius": random.randint(2, 5),
+            "color": random.choice(colors),
+            "speed": random.uniform(1, 3),
+            "drift": random.uniform(-1, 1)
+        })
+
+# Main loop
+while running:
+    screen.fill((0, 0, 0))
+    if menu_active:
+        draw_menu()
+    elif show_results:
+        draw_results()
+    else:
+        draw_question()
+    pygame.display.flip()
+
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            running = False
+        if event.type == pygame.KEYDOWN and not (menu_active or show_results):
+            if event.key == pygame.K_a:
+                selected = "A"
+            elif event.key == pygame.K_b:
+                selected = "B"
+            elif event.key == pygame.K_c:
+                selected = "C"
+            elif event.key == pygame.K_d:
+                selected = "D"
+            else:
+                selected = None
+            if selected:
+                correct = questions[question_index]["answer"]
+                value = questions[question_index].get("value", 1)
+                if selected == correct:
+                    score += 1
+                    section_score += value
+                question_index += 1
+                if question_index >= len(questions):
+                    show_results = True
+                    generate_confetti()
+
+pygame.quit()
+sys.exit()
